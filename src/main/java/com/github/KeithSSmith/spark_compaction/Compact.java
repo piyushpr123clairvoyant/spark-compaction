@@ -1,11 +1,7 @@
 package com.github.KeithSSmith.spark_compaction;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map.Entry;
-
+import com.typesafe.config.Config;
+import com.typesafe.config.ConfigFactory;
 import org.apache.commons.cli.*;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -14,18 +10,23 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.CompressionCodecFactory;
-import org.apache.spark.SparkConf;
-import org.apache.spark.api.java.JavaRDD;
-import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.sql.DataFrame;
-import org.apache.spark.sql.SQLContext;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SparkSession;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 
 public class Compact {
 
     private static Configuration conf = new Configuration();
-    private static CompressionCodecFactory codecFactory = null;
-    FileSystem fs = null;
-    FileStatus[] fsArray = null;
+    private static CompressionCodecFactory codecFactory;
+    private FileSystem fs;
+    private FileStatus[] fsArray;
     
     private static final String AVRO = "avro";
     private static final String BLOCK = "BLOCK";
@@ -77,15 +78,15 @@ public class Compact {
     private double inputCompressionRatio;
     private double outputCompressionRatio;
     private Path inputCompressionPath;
+
+	private Config config = ConfigFactory.load("application_configs.json");
+	private List<Map<String, Integer>> SIZE_RANGES_FOR_COMPACTION = (List<Map<String, Integer>>) config.getAnyRefList("compaction.size_ranges_for_compaction");
     
 
     public Compact() {
-        // Defining HDFS Configuration and File System definition.
-        conf.addResource(new Path("file:///etc/hadoop/conf/core-site.xml"));
-        conf.addResource(new Path("file:///etc/hadoop/conf/hdfs-site.xml"));
-        
+
         codecFactory = new CompressionCodecFactory(conf);
-        
+
         this.setInputPathSize(0);
     	this.setInputCompression(NONE);
     	this.setInputSerialization(TEXT);
@@ -131,32 +132,39 @@ public class Compact {
         serializationExtensions.put(AVRO, ".avro");
     }
 
-    public void outputCompressionProperties(String outputCompression) {
-        if (outputCompression.toLowerCase().equals(NONE)) {
-            System.setProperty(SHOULD_COMPRESS_OUTPUT, "false");
-            System.setProperty(SPARK_PARQUET_COMPRESSION_CODEC, "uncompressed");
-        } else if (outputCompression.toLowerCase().equals(SNAPPY)) {
-            System.setProperty(SHOULD_COMPRESS_OUTPUT, TRUE);
-            System.setProperty(OUTPUT_COMPRESSION_CODEC, "org.apache.hadoop.io.compress.SnappyCodec");
-            System.setProperty(COMPRESSION_TYPE, BLOCK);
-            System.setProperty(SPARK_PARQUET_COMPRESSION_CODEC, SNAPPY);
-            System.setProperty(SPARK_AVRO_COMPRESSION_CODEC, SNAPPY);
-            System.setProperty(AVRO_COMPRESSION_CODEC, SNAPPY);
-        } else if (outputCompression.toLowerCase().equals(GZIP)) {
-            System.setProperty(SHOULD_COMPRESS_OUTPUT, TRUE);
-            System.setProperty(OUTPUT_COMPRESSION_CODEC, "org.apache.hadoop.io.compress.GzipCodec");
-            System.setProperty(COMPRESSION_TYPE, BLOCK);
-            System.setProperty(SPARK_PARQUET_COMPRESSION_CODEC, GZIP);
-            System.setProperty(SPARK_AVRO_COMPRESSION_CODEC, GZIP);
-            System.setProperty(AVRO_COMPRESSION_CODEC, GZIP);
-        } else if (outputCompression.toLowerCase().equals(BZ2)) {
-            System.setProperty(SHOULD_COMPRESS_OUTPUT, TRUE);
-            System.setProperty(OUTPUT_COMPRESSION_CODEC, "org.apache.hadoop.io.compress.BZip2Codec");
-            System.setProperty(COMPRESSION_TYPE, BLOCK);
-            System.setProperty(SPARK_PARQUET_COMPRESSION_CODEC, BZ2);   //This will throw an error when Parquet + BZ2 is set b/c BZ2 is not supported in the upstream package.
-            System.setProperty(SPARK_AVRO_COMPRESSION_CODEC, BZ2);      //This will throw an error when Avro + BZ2 is set b/c BZ2 is not supported in the upstream package.
-            System.setProperty(AVRO_COMPRESSION_CODEC, BZ2);
-        }
+    private void outputCompressionProperties(String outputCompression) {
+		switch (outputCompression.toLowerCase()) {
+			case NONE:
+				System.setProperty(SHOULD_COMPRESS_OUTPUT, "false");
+				System.setProperty(SPARK_PARQUET_COMPRESSION_CODEC, "uncompressed");
+				break;
+			case SNAPPY:
+				System.setProperty(SHOULD_COMPRESS_OUTPUT, TRUE);
+				System.setProperty(OUTPUT_COMPRESSION_CODEC, "org.apache.hadoop.io.compress.SnappyCodec");
+				System.setProperty(COMPRESSION_TYPE, BLOCK);
+				System.setProperty(SPARK_PARQUET_COMPRESSION_CODEC, SNAPPY);
+				System.setProperty(SPARK_AVRO_COMPRESSION_CODEC, SNAPPY);
+				System.setProperty(AVRO_COMPRESSION_CODEC, SNAPPY);
+				break;
+			case GZIP:
+				System.setProperty(SHOULD_COMPRESS_OUTPUT, TRUE);
+				System.setProperty(OUTPUT_COMPRESSION_CODEC, "org.apache.hadoop.io.compress.GzipCodec");
+				System.setProperty(COMPRESSION_TYPE, BLOCK);
+				System.setProperty(SPARK_PARQUET_COMPRESSION_CODEC, GZIP);
+				System.setProperty(SPARK_AVRO_COMPRESSION_CODEC, GZIP);
+				System.setProperty(AVRO_COMPRESSION_CODEC, GZIP);
+				break;
+			case BZ2:
+				System.setProperty(SHOULD_COMPRESS_OUTPUT, TRUE);
+				System.setProperty(OUTPUT_COMPRESSION_CODEC, "org.apache.hadoop.io.compress.BZip2Codec");
+				System.setProperty(COMPRESSION_TYPE, BLOCK);
+				System.setProperty(SPARK_PARQUET_COMPRESSION_CODEC, BZ2);   //This will throw an error when Parquet + BZ2 is set b/c BZ2 is not supported in the upstream package.
+
+				System.setProperty(SPARK_AVRO_COMPRESSION_CODEC, BZ2);      //This will throw an error when Avro + BZ2 is set b/c BZ2 is not supported in the upstream package.
+
+				System.setProperty(AVRO_COMPRESSION_CODEC, BZ2);
+				break;
+		}
 //        } else if (outputCompression.toLowerCase().equals(LZO)) {
 //            System.setProperty(SHOULD_COMPRESS_OUTPUT, TRUE);
 //            System.setProperty(OUTPUT_COMPRESSION_CODEC, "com.hadoop.compression.lzo.LzoCodec");
@@ -166,60 +174,40 @@ public class Compact {
 //            System.setProperty(AVRO_COMPRESSION_CODEC, LZO);
 //        }
     }
-    
-    public void compact(String inputPath, String outputPath) throws IOException {
-        this.setCompressionAndSerializationOptions(inputPath, outputPath);
-        this.outputCompressionProperties(this.outputCompression);
-        
-    	// Defining Spark Context with a generic Spark Configuration.
-        SparkConf sparkConf = new SparkConf().setAppName("Spark Compaction");
-        JavaSparkContext sc = new JavaSparkContext(sparkConf);
-        
-        if (this.outputSerialization.equals(TEXT)) {
-            JavaRDD<String> textFile = sc.textFile(this.concatInputPath(inputPath));
-            textFile.coalesce(this.splitSize).saveAsTextFile(outputPath);
-        } else if (this.outputSerialization.equals(PARQUET)) {
-            SQLContext sqlContext = new SQLContext(sc);
-            DataFrame parquetFile = sqlContext.read().parquet(this.concatInputPath(inputPath));
-            parquetFile.coalesce(this.splitSize).write().parquet(outputPath);
-        } else if (this.outputSerialization.equals(AVRO)) {
-            // For this to work the files must end in .avro
-        	// Another issue is that when using compression the compression codec extension is not being added to the file name.
-            SQLContext sqlContext = new SQLContext(sc);
-            DataFrame avroFile = sqlContext.read().format("com.databricks.spark.avro").load(this.concatInputPath(inputPath));
-            avroFile.coalesce(this.splitSize).write().format("com.databricks.spark.avro").save(outputPath);
-        } else {
-            System.out.println("Did not match any serialization type: text, parquet, or avro.  Recieved: " +
-                    this.outputSerialization);
-        }
-    }
-    
-    public void compact(String[] args) throws IOException {
+
+    private void compact(String[] args) throws IOException {
     	this.setCompressionAndSerializationOptions(this.parseCli(args));
     	this.outputCompressionProperties(this.outputCompression);
-        
+
     	// Defining Spark Context with a generic Spark Configuration.
-        SparkConf sparkConf = new SparkConf().setAppName("Spark Compaction");
-        JavaSparkContext sc = new JavaSparkContext(sparkConf);
-                
-        if (this.outputSerialization.equals(TEXT)) {
-            JavaRDD<String> textFile = sc.textFile(this.concatInputPath(inputPath));
-            textFile.coalesce(this.splitSize).saveAsTextFile(outputPath);
-        } else if (this.outputSerialization.equals(PARQUET)) {
-            SQLContext sqlContext = new SQLContext(sc);
-            DataFrame parquetFile = sqlContext.read().parquet(this.concatInputPath(inputPath));
-            parquetFile.coalesce(this.splitSize).write().parquet(outputPath);
-        } else if (this.outputSerialization.equals(AVRO)) {
-            // For this to work the files must end in .avro
-            SQLContext sqlContext = new SQLContext(sc);
-            DataFrame avroFile = sqlContext.read().format("com.databricks.spark.avro").load(this.concatInputPath(inputPath));
-            avroFile.coalesce(this.splitSize).write().format("com.databricks.spark.avro").save(outputPath);
-        } else {
-            System.out.println("Did not match any serialization type: text, parquet, or avro.  Recieved: " +
-                    this.outputSerialization);
-        }
+		SparkSession spark = SparkSession
+				.builder()
+				.appName("Spark Compaction")
+				.getOrCreate();
+
+		switch (this.outputSerialization) {
+			case TEXT:
+				Dataset<Row> textFile = spark.read().load(this.concatInputPath(inputPath));
+				textFile.coalesce(this.splitSize).write().text(outputPath);
+				break;
+			case PARQUET: {
+				Dataset<Row> parquetFile = spark.read().parquet(this.concatInputPath(inputPath));
+				parquetFile.coalesce(this.splitSize).write().parquet(outputPath);
+				break;
+			}
+			case AVRO: {
+				// For this to work the files must end in avro
+				Dataset<Row> avroFile = spark.read().format("com.databricks.spark.avro").load(this.concatInputPath(inputPath));
+				avroFile.coalesce(this.splitSize).write().format("com.databricks.spark.avro").save(outputPath);
+				break;
+			}
+			default:
+				System.out.println("Did not match any serialization type: text, parquet, or avro.  Recieved: " +
+						this.outputSerialization);
+				break;
+		}
     }
-    
+
     public static void main(String[] args) throws IOException {
         // Defining Compact variable to process this compaction logic and parse the CLI arguments.
         Compact splits = new Compact();
@@ -240,7 +228,7 @@ public class Compact {
     }
     
     private String concatInputPath(String inputPath) throws IOException {
-    	List<String> resultList = new ArrayList<String>();
+    	List<String> resultList = new ArrayList<>();
     	
     	for(FileStatus fileStatus : fsArray) {
     		if (fileStatus.getPath().getName().startsWith("_") || fileStatus.getPath().getName().startsWith(".")) {
@@ -303,7 +291,7 @@ public class Compact {
         } catch (ParseException e) {
             printHelp("");
         }
-        
+
         this.setInputPath(line.getOptionValue(INPUT_PATH));
         this.setOutputPath(line.getOptionValue(OUTPUT_PATH));
         this.setOutputBlockSize(this.outputPath);
@@ -339,22 +327,11 @@ public class Compact {
     	this.validateCompressionAndSerializationOptions();
     }
 
-    private void setCompressionAndSerializationOptions(String inputPath, String outputPath) throws IOException {
-    	this.setInputPath(inputPath);
-    	this.setInputCompression(new Path(this.getInputPath()));
-        this.setOutputPath(outputPath);
-        this.setOutputBlockSize(outputPath);
-    	this.setOutputCompression(this.getInputCompression());        // Output Compression will the be same as the Input if left null.
-    	this.setOutputSerialization(this.getInputSerialization());    // Output Serialization will the be same as the Input if left null.
-        
-    	this.validateCompressionAndSerializationOptions();
-    }
-
     private void validateCompressionAndSerializationOptions() throws IllegalArgumentException, IOException {
         String errorMsg = null;
         
         String ic = this.getInputCompression();
-        if(null == errorMsg && !ic.equals(BZ2) && !ic.equals(GZIP) && !ic.equals(NONE)  && !ic.equals(SNAPPY)) {
+        if(!ic.equals(BZ2) && !ic.equals(GZIP) && !ic.equals(NONE) && !ic.equals(SNAPPY)) {
             errorMsg = "Invalid input compression format specified!";
         }
         String is = this.getInputSerialization();
@@ -373,37 +350,24 @@ public class Compact {
         if(null != errorMsg) {
             printHelp(errorMsg);
         }
-        
+
         this.setInputCompressionRatio(this.inputCompression, this.inputSerialization);
         this.setOutputCompressionRatio(this.outputCompression, this.outputSerialization);
         this.setInputPathSize(this.inputPath);
-        this.setSplitSize(this.outputPath);
+//        this.setSplitSize(this.outputPath);
+		this.setSplitSize(SIZE_RANGES_FOR_COMPACTION,this.inputPath);
     }
 
 	public long getInputPathSize() {
 		return inputPathSize;
 	}
-	
+
     public void setInputPathSize(long inputSize) {
 		this.inputPathSize = inputSize;
 	}
 	
     public void setInputPathSize(String inputPath) throws IOException {
         long fileSize = 0;
-    	
-    	for (FileStatus fileStatus : this.fsArray) {
-        	if (fileStatus.getPath().getName().startsWith("_") || fileStatus.getPath().getName().startsWith(".")) {
-        		continue;
-        	}
-        	fileSize = fileSize + this.fs.getContentSummary(fileStatus.getPath()).getSpaceConsumed();
-        }
-        
-        this.inputPathSize = (long) (fileSize * this.inputCompressionRatio);
-    }
-    
-    public void setInputPathSize(String inputPath, String inputCompression, String inputSerialization) throws IOException {
-        long fileSize = 0;
-    	this.setInputCompressionRatio(inputCompression, inputSerialization);
     	
     	for (FileStatus fileStatus : this.fsArray) {
         	if (fileStatus.getPath().getName().startsWith("_") || fileStatus.getPath().getName().startsWith(".")) {
@@ -434,6 +398,40 @@ public class Compact {
         double inputPathSizeDouble = (double) inputPathSize;
         this.splitSize = (int) (Math.floor(((inputPathSizeDouble / outputCompressionRatio) / this.outputBlockSize)) + 1.0);
     }
+
+    private void setSplitSize(List<Map<String, Integer>> SIZE_RANGES_FOR_COMPACTION, String inputPath) throws IOException {
+
+		FileSystem fs = FileSystem.get(conf);
+		Path filenamePath = new Path(inputPath);
+		long hdfsDirSize = fs.getContentSummary(filenamePath).getSpaceConsumed();
+		double hdfsDirSizeInMB = hdfsDirSize * 0.00000095367432;
+		double hdfsDirSizeInGB = hdfsDirSizeInMB * 0.0009756;
+		System.out.println("SIZE OF THE HDFS DIRECTORY in MB : " + hdfsDirSizeInMB);
+		System.out.println("SIZE OF THE HDFS DIRECTORY in GB : " + hdfsDirSizeInGB);
+
+		for (Map<String, Integer> entry : SIZE_RANGES_FOR_COMPACTION) {
+
+			double maxSizeInGB = entry.get("max_size_in_gb");
+			double minSizeInGB = entry.get("min_size_in_gb");
+			double sizeInMbAfterCompaction = entry.get("size_after_compaction_in_mb");
+
+			System.out.println("Min GB = " + minSizeInGB);
+			System.out.println("Max GB = " + maxSizeInGB);
+			System.out.println("Size After Compaction = " + sizeInMbAfterCompaction);
+
+			if(maxSizeInGB == 0){
+				maxSizeInGB = hdfsDirSizeInGB;
+			}
+
+			if ((minSizeInGB <= hdfsDirSizeInGB) && (maxSizeInGB >= hdfsDirSizeInGB)) {
+				int numberOfPartitions = (int) Math.round(hdfsDirSizeInMB/sizeInMbAfterCompaction);
+				System.out.println("Num Partitions: " + numberOfPartitions);
+				this.splitSize = numberOfPartitions;
+			}
+
+			System.out.println("End of Element");
+		}
+	}
 
 	public double getInputCompressionRatio() {
 		return inputCompressionRatio;
