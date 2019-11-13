@@ -3,6 +3,7 @@
     "master": "local[*]",
     "spark_executor_instances": 4,
     "spark_executor_memory": "4g",
+    "spark_executor_cores": 2,
     "app_name": "SPARK_COMPACTION"
   },
   "kerberos": {
