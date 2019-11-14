@@ -183,6 +183,17 @@ public class Compact {
 				.appName(SPARK_APP_NAME)
 				.getOrCreate();
 
+		LOGGER.info("Input Path: " + inputPath);
+		LOGGER.info("Output Path: " + outputPath);
+
+		LOGGER.info("Input Compression: " + inputCompression);
+		LOGGER.info("Output Compression: " + outputCompression);
+
+		LOGGER.info("Input serialization: " + inputSerialization);
+		LOGGER.info("Output serialization: " + outputSerialization);
+
+		LOGGER.info("Compaction Strategy: " + compactionStrategy);
+
 		switch (this.outputSerialization) {
 			case TEXT:
 				Dataset<Row> textFile = spark.read().load(this.concatInputPath(inputPath));
@@ -271,7 +282,7 @@ public class Compact {
 
 		option = new Option("cs", COMPACTION_STRATEGY, true,
 				"The Compaction Strategy to be used to calculate the split size");
-		option.setRequired(true);
+		option.setRequired(false);
 		options.addOption(option);
 	}
 
@@ -296,6 +307,15 @@ public class Compact {
 		this.setInputPath(line.getOptionValue(INPUT_PATH));
 		this.setOutputPath(line.getOptionValue(OUTPUT_PATH));
 		this.setOutputBlockSize(this.outputPath);
+
+		String compactionStrategyFromCli = line.getOptionValue(COMPACTION_STRATEGY);
+
+		if(compactionStrategyFromCli != null){
+			this.setCompactionStrategy(compactionStrategyFromCli);
+		} else{
+			this.setCompactionStrategy("default");
+		}
+
 
 		return line;
 	}
@@ -356,11 +376,11 @@ public class Compact {
 		this.setOutputCompressionRatio(this.outputCompression, this.outputSerialization);
 		this.setInputPathSize(this.inputPath);
 
-		LOGGER.info("Compaction Strategy: " + COMPACTION_STRATEGY);
-
 		if (compactionStrategy.equals("size_range")) {
+			LOGGER.info("Setting Number of partitions using Size Range Strategy");
 			this.setSplitSize(SIZE_RANGES_FOR_COMPACTION, this.inputPath);
 		} else {
+			LOGGER.info("Setting Number of partitions using Default Strategy");
 			this.setSplitSize(this.outputPath);
 		}
 
@@ -414,8 +434,6 @@ public class Compact {
 		long hdfsDirSize = fs.getContentSummary(filenamePath).getSpaceConsumed();
 		double hdfsDirSizeInMB = hdfsDirSize * 0.00000095367432;
 		double hdfsDirSizeInGB = hdfsDirSizeInMB * 0.0009756;
-		System.out.println("SIZE OF THE HDFS DIRECTORY in MB : " + hdfsDirSizeInMB);
-		System.out.println("SIZE OF THE HDFS DIRECTORY in GB : " + hdfsDirSizeInGB);
 
 		for (Map<String, Integer> entry : SIZE_RANGES_FOR_COMPACTION) {
 
@@ -423,21 +441,14 @@ public class Compact {
 			double minSizeInGB = entry.get("min_size_in_gb");
 			double sizeInMbAfterCompaction = entry.get("size_after_compaction_in_mb");
 
-			System.out.println("Min GB = " + minSizeInGB);
-			System.out.println("Max GB = " + maxSizeInGB);
-			System.out.println("Size After Compaction = " + sizeInMbAfterCompaction);
-
 			if (maxSizeInGB == 0) {
 				maxSizeInGB = hdfsDirSizeInGB;
 			}
 
 			if ((minSizeInGB <= hdfsDirSizeInGB) && (maxSizeInGB >= hdfsDirSizeInGB)) {
 				int numberOfPartitions = (int) Math.round(hdfsDirSizeInMB / sizeInMbAfterCompaction);
-				System.out.println("Num Partitions: " + numberOfPartitions);
 				this.splitSize = numberOfPartitions;
 			}
-
-			System.out.println("End of Element");
 		}
 	}
 
