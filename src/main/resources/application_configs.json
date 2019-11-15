@@ -11,9 +11,6 @@
     "principal": ""
   },
   "compaction": {
-    "enable_num_files": false,
-    "num_files": 10,
-    "compression": "snappy",
     "size_ranges_for_compaction": [
       {
         "min_size_in_gb": 0,

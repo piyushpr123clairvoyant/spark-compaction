@@ -18,6 +18,8 @@ Example 1: Strategy: size_range
     sh run_compaction.sh --input-path {input_path} --output-path {output_path} --input-compression [none snappy gzip bz2 lzo] --input-serialization [text parquet avro] --output-compression [none snappy gzip bz2 lzo] --output-serialization [text parquet avro] --compaction-strategy size_range
 Example 2: Strategy: Default
     sh run_compaction.sh --input-path {input_path} --output-path {output_path} --input-compression [none snappy gzip bz2 lzo] --input-serialization [text parquet avro] --output-compression [none snappy gzip bz2 lzo] --output-serialization [text parquet avro] --compaction-strategy default
+        (or)
+    sh run_compaction.sh --input-path {input_path} --output-path {output_path} --input-compression [none snappy gzip bz2 lzo] --input-serialization [text parquet avro] --output-compression [none snappy gzip bz2 lzo] --output-serialization [text parquet avro]
 """
 
 POSITIONAL=()
@@ -83,13 +85,10 @@ if [[ -z "${COMPACTION_STRATEGY}" ]]; then
     COMPACTION_STRATEGY="default"
 fi
 
-echo "Hello"
-
-
 BIN_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 LIB_DIR="${BIN_DIR}/../lib"
 CONF_DIR="${BIN_DIR}/../conf"
-JAR_FILE_LOCATION="${LIB_DIR}/spark-compaction-jar-with-dependencies.jar"
+JAR_FILE_LOCATION="${LIB_DIR}/spark-compaction-1.0.0-jar-with-dependencies.jar"
 APPLICATION_CONF_FILE="${CONF_DIR}/application_configs.json"
 
 SPARK_APP_NAME=`cat "$APPLICATION_CONF_FILE" | python -c "import json,sys;obj=json.load(sys.stdin);print obj['spark']['app_name'];"`
@@ -114,5 +113,5 @@ elif [[ "${SPARK_MASTER}" = "yarn-cluster" ]]; then
 fi
 
 echo "executing: ${SPARK_SUBMIT_STARTUP_CMD}"
-#eval ${SPARK_SUBMIT_STARTUP_CMD}
+eval ${SPARK_SUBMIT_STARTUP_CMD}
 echo "PID: $!"
