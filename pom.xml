@@ -2,8 +2,8 @@
 		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
-	<groupId>com.apache.bigdata</groupId>
-	<artifactId>spark-compaction</artifactId>
+	<groupId>com.apache.spark.external</groupId>
+	<artifactId>compaction</artifactId>
 	<version>1.0.0</version>
 	<packaging>jar</packaging>
 
@@ -16,7 +16,7 @@
 		<spark.version>2.3.0.cloudera4</spark.version>
 		<slf4j.version>1.7.21</slf4j.version>
 
-		<main.class>com.apache.bigdata.spark_compaction.Compact</main.class>
+		<main.class>com.apache.spark.external.compaction.Compact</main.class>
 	</properties>
 
 	<repositories>

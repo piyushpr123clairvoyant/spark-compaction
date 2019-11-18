@@ -1,4 +1,4 @@
-package com.apache.bigdata.spark_compaction;
+package com.apache.spark.external.compaction;
 
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
