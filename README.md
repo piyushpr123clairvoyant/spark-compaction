@@ -7,12 +7,12 @@ In this Project we have 2 Compaction Strategies. They are
 
    1. Default(default): In this Strategy number of output files to be generated after compaction is calculated depending on the calculation give below in Compression Math. If we provide default in the compaction_strategy argument or skip the compaction_strategy argument then this strategy is used to calculate the number of output files to be written to HDFS after compaction.
     
-    #### Compression Math
+    Compression Math
     
     At a high level this class will calculate the number of output files to efficiently fill the default HDFS block size on the cluster taking into consideration the size of the data, compression type, and serialization type.
     
-    **Compression Ratio Assumptions**
-    ```vim
+    Compression Ratio Assumptions:
+    
     SNAPPY_RATIO = 1.7;     // (100 / 1.7) = 58.8 ~ 40% compression rate on text
     LZO_RATIO = 2.0;        // (100 / 2.0) = 50.0 ~ 50% compression rate on text
     GZIP_RATIO = 2.5;       // (100 / 2.5) = 40.0 ~ 60% compression rate on text
@@ -20,34 +20,34 @@ In this Project we have 2 Compaction Strategies. They are
     
     AVRO_RATIO = 1.6;       // (100 / 1.6) = 62.5 ~ 40% compression rate on text
     PARQUET_RATIO = 2.0;    // (100 / 2.0) = 50.0 ~ 50% compression rate on text
-    ```
     
-    **Compression Ratio Formula**
-    ```vim
+    
+    Compression Ratio Formula:
+    
     Input Compression Ratio * Input Serialization Ratio * Input File Size = Input File Size Inflated
     Input File Size Inflated / ( Output Compression Ratio * Output Serialization Ratio ) = Output File Size
     Output File Size / Block Size of Output Directory = Number of Blocks Filled
     FLOOR( Number of Blocks Filled ) + 1 = Efficient Number of Files to Store
-    ```
+    
     
     ### Text Compaction
     
-    **Text to Text Calculation**
-    ```vim
+    Text to Text Calculation:
+    
     Read Input Directory Total Size = x
     Detect Output Directory Block Size = 134217728 => y
     
     Output Files: FLOOR( x / y ) + 1 = # of Mappers
-    ```
     
-    **Text to Text Snappy Calculation**
-    ```vim
+    
+    Text to Text Snappy Calculation:
+    
     Default Block Size = 134217728 => y
     Read Input Directory Total Size = x
     Compression Ratio = 1.7 => r
     
     Output Files: FLOOR( x / (r * y) ) + 1 = # of Mappers
-    ```
+    
     
 2. Size Range(size_range): In this Strategy user will provide the range in the config file. So the final disk space occupied is calculated and checked under which range it falls and its corresponding value is taken as output file size.
 ```
