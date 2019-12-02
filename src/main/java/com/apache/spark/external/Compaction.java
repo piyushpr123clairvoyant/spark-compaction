@@ -1,4 +1,4 @@
-package com.apache.spark.external.compaction;
+package com.apache.spark.external;
 
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
@@ -23,9 +23,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-public class Compact {
+public class Compaction {
 
-	private static final Logger LOGGER = LoggerFactory.getLogger(Compact.class);
+	private static final Logger LOGGER = LoggerFactory.getLogger(Compaction.class);
 
 	private static Configuration conf = new Configuration();
 	private static CompressionCodecFactory codecFactory;
@@ -90,7 +90,7 @@ public class Compact {
 	private String SPARK_APP_NAME = config.getString("spark.app_name");
 
 
-	public Compact() {
+	public Compaction() {
 
 		codecFactory = new CompressionCodecFactory(conf);
 
@@ -219,7 +219,7 @@ public class Compact {
 
 	public static void main(String[] args) throws IOException {
 		// Defining Compact variable to process this compaction logic and parse the CLI arguments.
-		Compact splits = new Compact();
+		Compaction splits = new Compaction();
 		// Example of calling the CLI.
 		splits.compact(args);
 	}

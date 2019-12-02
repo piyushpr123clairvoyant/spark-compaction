@@ -1,74 +1,83 @@
 # Spark Compaction
-When streaming data into HDFS, small messages are written to a large number of files that if left unchecked will cause unnecessary strain on the HDFS NameNode.  To handle this situation, it is good practice to run a compaction job on directories that contain many small files to help reduce the resource strain of the NameNode by ensuring HDFS blocks are filled efficiently.  It is common practice to do this type of compaction with MapReduce or on Hive tables / partitions and this tool is designed to accomplish the same type of task utilizing Spark.
+When streaming data into HDFS, small messages are written to a large number of files that if left unchecked will cause unnecessary strain on the HDFS NameNode. To handle this situation, it is good practice to run a compaction job on directories that contain many small files to help reduce the resource strain of the NameNode by ensuring HDFS blocks are filled efficiently.  It is common practice to do this type of compaction with MapReduce or on Hive tables / partitions and this tool is designed to accomplish the same type of task utilizing Spark.
 
 **Compaction Strategies:**
+
+In this Project we have 2 Compaction Strategies. They are 
+
+   1. Default(default): In this Strategy number of output files to be generated after compaction is calculated depending on the calculation give below in Compression Math. If we provide default in the compaction_strategy argument or skip the compaction_strategy argument then this strategy is used to calculate the number of output files to be written to HDFS after compaction.
+    
+    #### Compression Math
+    
+    At a high level this class will calculate the number of output files to efficiently fill the default HDFS block size on the cluster taking into consideration the size of the data, compression type, and serialization type.
+    
+    **Compression Ratio Assumptions**
+    ```vim
+    SNAPPY_RATIO = 1.7;     // (100 / 1.7) = 58.8 ~ 40% compression rate on text
+    LZO_RATIO = 2.0;        // (100 / 2.0) = 50.0 ~ 50% compression rate on text
+    GZIP_RATIO = 2.5;       // (100 / 2.5) = 40.0 ~ 60% compression rate on text
+    BZ2_RATIO = 3.33;       // (100 / 3.3) = 30.3 ~ 70% compression rate on text
+    
+    AVRO_RATIO = 1.6;       // (100 / 1.6) = 62.5 ~ 40% compression rate on text
+    PARQUET_RATIO = 2.0;    // (100 / 2.0) = 50.0 ~ 50% compression rate on text
+    ```
+    
+    **Compression Ratio Formula**
+    ```vim
+    Input Compression Ratio * Input Serialization Ratio * Input File Size = Input File Size Inflated
+    Input File Size Inflated / ( Output Compression Ratio * Output Serialization Ratio ) = Output File Size
+    Output File Size / Block Size of Output Directory = Number of Blocks Filled
+    FLOOR( Number of Blocks Filled ) + 1 = Efficient Number of Files to Store
+    ```
+    
+    ### Text Compaction
+    
+    **Text to Text Calculation**
+    ```vim
+    Read Input Directory Total Size = x
+    Detect Output Directory Block Size = 134217728 => y
+    
+    Output Files: FLOOR( x / y ) + 1 = # of Mappers
+    ```
+    
+    **Text to Text Snappy Calculation**
+    ```vim
+    Default Block Size = 134217728 => y
+    Read Input Directory Total Size = x
+    Compression Ratio = 1.7 => r
+    
+    Output Files: FLOOR( x / (r * y) ) + 1 = # of Mappers
+    ```
+    
+2. Size Range(size_range): In this Strategy user will provide the range in the config file. So the final disk space occupied is calculated and checked under which range it falls and its corresponding value is taken as output file size.
 ```
-1. Default(default): In this Strategy number of output files to be generated after compaction is calculated depending on the calculation give below in compression Math.
-2. Size Range(size_range): In this Strategy user will provide the range in the config file. So the final disck space occupied is calculated and checked under which range it falls and its corresponding value is taken as output file size.
-   Example: "compaction": {
-                "size_ranges_for_compaction": [
-                  {
-                    "min_size_in_gb": 0,
-                    "max_size_in_gb": 50,
-                    "size_after_compaction_in_mb": 256
-                  },
-                  {
-                    "min_size_in_gb": 50,
-                    "max_size_in_gb": 100,
-                    "size_after_compaction_in_mb": 512
-                  },
-                  {
-                    "min_size_in_gb": 100,
-                    "max_size_in_gb": 0,
-                    "size_after_compaction_in_mb": 1000
+    Example: "compaction": {
+                    "size_ranges_for_compaction": [
+                      {
+                        "min_size_in_gb": 0,
+                        "max_size_in_gb": 50,
+                        "size_after_compaction_in_mb": 256
+                      },
+                      {
+                        "min_size_in_gb": 50,
+                        "max_size_in_gb": 100,
+                        "size_after_compaction_in_mb": 512
+                      },
+                      {
+                        "min_size_in_gb": 100,
+                        "max_size_in_gb": 0,
+                        "size_after_compaction_in_mb": 1000
+                      }
+                    ]
                   }
-                ]
-              }
     The Range is taken between "min_size_in_gb" and "max_size_in_gb". If the size of the files falls under the range then "size_after_compaction_in_mb" is taken as output file size. And total space occupied by the files is then divided by the output file size and the result is the number of output files.
-        Nubmer of Output files = (Total disk space occupied by files in mb)/(size_after_compaction_in_mb)
-```
+       Number of Output files = (Total disk space occupied by files in mb)/(size_after_compaction_in_mb)
+        
+    Lets just assume that out directory size(before compaction) is 28000MB(28GB). Then our directory falls under the first block(0 to 50GB) criteria. Which means the output file should be of 256MB each(after compaction).
+       Now Number of Output files = 28000/256 = 109.375 = 110(Rounding off to the next whole number)
+       Now the spark job will write the data into 110 files with file size ~ 256 mb.
 
-## Compression Math
-
-At a high level this class will calculate the number of output files to efficiently fill the default HDFS block size on the cluster taking into consideration the size of the data, compression type, and serialization type.
-
-**Compression Ratio Assumptions**
-```vim
-SNAPPY_RATIO = 1.7;     // (100 / 1.7) = 58.8 ~ 40% compression rate on text
-LZO_RATIO = 2.0;        // (100 / 2.0) = 50.0 ~ 50% compression rate on text
-GZIP_RATIO = 2.5;       // (100 / 2.5) = 40.0 ~ 60% compression rate on text
-BZ2_RATIO = 3.33;       // (100 / 3.3) = 30.3 ~ 70% compression rate on text
-
-AVRO_RATIO = 1.6;       // (100 / 1.6) = 62.5 ~ 40% compression rate on text
-PARQUET_RATIO = 2.0;    // (100 / 2.0) = 50.0 ~ 50% compression rate on text
-```
-
-**Compression Ratio Formula**
-```vim
-Input Compression Ratio * Input Serialization Ratio * Input File Size = Input File Size Inflated
-Input File Size Inflated / ( Output Compression Ratio * Output Serialization Ratio ) = Output File Size
-Output File Size / Block Size of Output Directory = Number of Blocks Filled
-FLOOR( Number of Blocks Filled ) + 1 = Efficient Number of Files to Store
-```
-
-### Text Compaction
-
-**Text to Text Calculation**
-```vim
-Read Input Directory Total Size = x
-Detect Output Directory Block Size = 134217728 => y
-
-Output Files: FLOOR( x / y ) + 1 = # of Mappers
-```
-
-**Text to Text Snappy Calculation**
-```vim
-Default Block Size = 134217728 => y
-Read Input Directory Total Size = x
-Compression Ratio = 1.7 => r
-
-Output Files: FLOOR( x / (r * y) ) + 1 = # of Mappers
-```
+```   
 
 **Execution Using Shell Script**
 ```
