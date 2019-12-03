@@ -1,25 +1,27 @@
 #!/usr/bin/env bash
 
+SPARK_SUBMIT_CMD="spark2-submit"
+
 HELP_STR="""
 
 Required Arguments:
-    1. --input-path
-    2. --output-path
-    3. --input-compression
-    4. --input-serialization
+    --input-path
+    --output-path
+    --input-compression
+    --input-serialization
 
 Optional Arguments:
-    1. --output-compression(Taken as input compression if not provided)
-    2. --output-serialization(Taken as input serialization if not provided)
-    3. --compaction-strategy(Taken as default if not provided)
+    --output-compression(Taken as input compression if not provided)
+    --output-serialization(Taken as input serialization if not provided)
+    --compaction-strategy(Taken as default if not provided)
 
 Please provide the arguments as follows
 Example 1: Strategy: size_range
-    sh run_compaction.sh --input-path {input_path} --output-path {output_path} --input-compression [none snappy gzip bz2 lzo] --input-serialization [text parquet avro] --output-compression [none snappy gzip bz2 lzo] --output-serialization [text parquet avro] --compaction-strategy size_range
+    sh spark-compaction.sh --input-path {input_path} --output-path {output_path} --input-compression [none snappy gzip bz2 lzo] --input-serialization [text parquet avro] --output-compression [none snappy gzip bz2 lzo] --output-serialization [text parquet avro] --compaction-strategy size_range
 Example 2: Strategy: Default
-    sh run_compaction.sh --input-path {input_path} --output-path {output_path} --input-compression [none snappy gzip bz2 lzo] --input-serialization [text parquet avro] --output-compression [none snappy gzip bz2 lzo] --output-serialization [text parquet avro] --compaction-strategy default
+    sh spark-compaction.sh --input-path {input_path} --output-path {output_path} --input-compression [none snappy gzip bz2 lzo] --input-serialization [text parquet avro] --output-compression [none snappy gzip bz2 lzo] --output-serialization [text parquet avro] --compaction-strategy default
         (or)
-    sh run_compaction.sh --input-path {input_path} --output-path {output_path} --input-compression [none snappy gzip bz2 lzo] --input-serialization [text parquet avro] --output-compression [none snappy gzip bz2 lzo] --output-serialization [text parquet avro]
+    sh spark-compaction.sh --input-path {input_path} --output-path {output_path} --input-compression [none snappy gzip bz2 lzo] --input-serialization [text parquet avro] --output-compression [none snappy gzip bz2 lzo] --output-serialization [text parquet avro]
 """
 
 POSITIONAL=()
@@ -88,7 +90,7 @@ fi
 BIN_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 LIB_DIR="${BIN_DIR}/../lib"
 CONF_DIR="${BIN_DIR}/../conf"
-JAR_FILE_LOCATION="${LIB_DIR}/spark-compaction-1.0.0-jar-with-dependencies.jar"
+JAR_FILE_LOCATION="${LIB_DIR}/spark-compaction-*-jar-with-dependencies.jar"
 APPLICATION_CONF_FILE="${CONF_DIR}/application_configs.json"
 
 SPARK_APP_NAME=`cat "$APPLICATION_CONF_FILE" | python -c "import json,sys;obj=json.load(sys.stdin);print obj['spark']['app_name'];"`
@@ -99,7 +101,6 @@ SPARK_EXECUTOR_CORES=`cat "$APPLICATION_CONF_FILE" | python -c "import json,sys;
 KEYTAB_LOCATION=`cat "$APPLICATION_CONF_FILE" | python -c "import json,sys;obj=json.load(sys.stdin);print obj['kerberos']['keytab'];"`
 KERBEROS_PRINCIPAL=`cat "$APPLICATION_CONF_FILE" | python -c "import json,sys;obj=json.load(sys.stdin);print obj['kerberos']['principal'];"`
 
-SPARK_SUBMIT_CMD="spark2-submit"
 LOG_FILE="${BIN_DIR}/../logs/${SPARK_APP_NAME}__started_at_`date '+%Y%m%d%H%M%S'`"
 
 echo ${SPARK_MASTER}
@@ -114,4 +115,3 @@ fi
 
 echo "executing: ${SPARK_SUBMIT_STARTUP_CMD}"
 eval ${SPARK_SUBMIT_STARTUP_CMD}
-echo "PID: $!"

@@ -88,6 +88,7 @@ Instructions to Deploy the app:
       mkdir bin
       mkdir conf
       mkdir lib 
+      mkdir logs
 2. Now do the following steps to copy the files to the project directory.
       a. Copy the application_configs.json file from the resources dir in the project to conf directory. Update the application_configs.json file with the required configurations.
       b. Copy the jar file thats created by running `mvn clean install` to lib directory.
@@ -98,11 +99,7 @@ Instructions to Deploy the app:
 **Execution Options**
 
 ```vim
-spark-submit \
-  --class com.apache.bigdata.spark_compaction.Compact \
-  --master local[2] \
-  --driver-class-path {CONF_PATH}:${JAR_PATH}/spark-compaction-1.0.0-jar-with-dependencies.jar \
-  ${JAR_PATH}/spark-compaction-1.0.0-jar-with-dependencies.jar \
+spark-compaction.sh \
   --input-path ${INPUT_PATH} \
   --output-path ${OUTPUT_PATH} \
   --input-compression [none snappy gzip bz2 lzo] \
@@ -117,11 +114,7 @@ It is not required to pass the last four variables as it will be inferred from t
 **Execution Example (Text to Text):**
 
 ```vim
-spark-submit \
-  --class com.apache.bigdata.spark_compaction.Compact \
-  --master local[2] \
-  --driver-class-path {CONF_PATH}:${JAR_PATH}/spark-compaction-1.0.0-jar-with-dependencies.jar \
-  ${JAR_PATH}/spark-compaction-1.0.0-jar-with-dependencies.jar \
+spark-compaction.sh \
   -i ${INPUT_PATH} \
   -o ${OUTPUT_PATH} \
   -ic [input_compression] \
@@ -130,11 +123,7 @@ spark-submit \
   -os [output_serialization] \
   -cs [default size_range]
 
-spark-submit \
-  --class com.apache.bigdata.spark_compaction.Compact \
-  --master local[2] \
-  --driver-class-path {CONF_PATH}:${JAR_PATH}/spark-compaction-1.0.0-jar-with-dependencies.jar \
-  ${JAR_PATH}/spark-compaction-1.0.0-jar-with-dependencies.jar \
+spark-compaction.sh \
   -i hdfs:///landing/compaction/input \
   -o hdfs:///landing/compaction/output \
   -ic none \
@@ -143,13 +132,6 @@ spark-submit \
   -os text \
   -cs default
 
-spark-submit \
-  --class com.apache.bigdata.spark_compaction.Compact \
-  --driver-class-path {CONF_PATH}:${JAR_PATH}/spark-compaction-1.0.0-jar-with-dependencies.jar \
-  --master local[2] \
-  ${JAR_PATH}/spark-compaction-1.0.0-jar-with-dependencies.jar \
-  -i hdfs:///landing/compaction/input \
-  -o hdfs:///landing/compaction/output
 ```
 
 To elaborate further, the following example has an input directory consisting of 9,999 files consuming 440 MB of space.  Using the default block size, the resulting output files are 146 MB in size, easily fitting into a data block.
@@ -236,11 +218,7 @@ $ hdfs dfs -du -h /landing/compaction/partition/output_2016-01-01/* | wc -l
 
 **Wildcard for Multiple Sub Directory Compaction**
 ```vim
-spark-submit \
-  --class --class com.apache.bigdata.spark_compaction.Compact \
-  --master local[2] \
-  --driver-class-path {CONF_PATH}:${JAR_PATH}/spark-compaction-1.0.0-jar-with-dependencies.jar \
-  ${JAR_PATH}/spark-compaction-1.0.0-jar-with-dependencies.jar \
+spark-compaction.sh \
   --input-path hdfs:///landing/compaction/partition/date=2016-01-01/hour=* \
   --output-path hdfs:///landing/compaction/partition/output_2016-01-01 \
   --input-compression none \
